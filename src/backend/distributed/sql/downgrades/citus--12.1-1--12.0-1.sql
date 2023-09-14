@@ -22,3 +22,18 @@ DROP FUNCTION pg_catalog.citus_schema_move(
     schema_id regnamespace, target_node_id integer,
     shard_transfer_mode citus.shard_transfer_mode
 );
+
+
+DROP FUNCTION pg_catalog.citus_internal_start_management_transaction(
+    outer_xid xid8
+);
+
+DROP FUNCTION pg_catalog.execute_command_on_other_nodes(
+    query text
+);
+
+DROP FUNCTION pg_catalog.citus_mark_object_distributed(
+    classId Oid, objectName text, objectId Oid
+);
+
+ALTER TABLE pg_catalog.pg_dist_transaction DROP COLUMN outer_xid;

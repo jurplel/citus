@@ -10,3 +10,10 @@
 #include "udfs/citus_internal_delete_placement_metadata/12.1-1.sql"
 
 #include "udfs/citus_schema_move/12.1-1.sql"
+
+
+#include "udfs/citus_internal_start_management_transaction/12.1-1.sql"
+#include "udfs/execute_command_on_other_nodes/12.1-1.sql"
+#include "udfs/add_to_pg_dist_object_on_all_nodes/12.1-1.sql"
+
+ALTER TABLE pg_catalog.pg_dist_transaction ADD COLUMN outer_xid xid8;

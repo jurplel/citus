@@ -11,6 +11,7 @@ ORDER BY 1;
                                                        description
 ---------------------------------------------------------------------
  event trigger citus_cascade_to_partition
+ function add_to_pg_dist_node_on_all_nodes(oid,text,oid)
  function alter_distributed_table(regclass,text,integer,text,boolean)
  function alter_old_partitions_set_access_method(regclass,timestamp with time zone,name)
  function alter_role_if_exists(text,text)
@@ -179,6 +180,7 @@ ORDER BY 1;
  function drop_old_time_partitions(regclass,timestamp with time zone)
  function dump_global_wait_edges()
  function dump_local_wait_edges()
+ function execute_command_on_other_nodes(text)
  function fetch_intermediate_results(text[],text,integer)
  function fix_all_partition_shard_index_names()
  function fix_partition_shard_index_names(regclass)
@@ -242,6 +244,7 @@ ORDER BY 1;
  function run_command_on_shards(regclass,text,boolean)
  function run_command_on_workers(text,boolean)
  function shard_name(regclass,bigint)
+ function start_management_transaction(xid8)
  function start_metadata_sync_to_all_nodes()
  function start_metadata_sync_to_node(text,integer)
  function stop_metadata_sync_to_node(text,integer,boolean)
@@ -343,5 +346,5 @@ ORDER BY 1;
  view citus_stat_tenants_local
  view pg_dist_shard_placement
  view time_partitions
-(333 rows)
+(336 rows)
 

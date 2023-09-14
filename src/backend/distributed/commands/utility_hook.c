@@ -63,6 +63,7 @@
 #include "distributed/multi_explain.h"
 #include "distributed/multi_physical_planner.h"
 #include "distributed/reference_table_utils.h"
+#include "distributed/remote_commands.h"
 #include "distributed/resource_lock.h"
 #include "distributed/string_utils.h"
 #include "distributed/transaction_management.h"
@@ -74,6 +75,7 @@
 #include "nodes/parsenodes.h"
 #include "nodes/pg_list.h"
 #include "nodes/makefuncs.h"
+#include "postmaster/postmaster.h"
 #include "tcop/utility.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
@@ -109,6 +111,8 @@ static void PostStandardProcessUtility(Node *parsetree);
 static void DecrementUtilityHookCountersIfNecessary(Node *parsetree);
 static bool IsDropSchemaOrDB(Node *parsetree);
 static bool ShouldCheckUndistributeCitusLocalTables(void);
+
+static MultiConnection *managementCon = NULL;
 
 /*
  * ProcessUtilityParseTree is a convenience method to create a PlannedStmt out of
@@ -240,12 +244,52 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 
 	if (!CitusHasBeenLoaded())
 	{
+		if (IsA(parsetree, CreateRoleStmt))
+		{
+			if (!isCitusManagementDatabase())
+			{
+				int flags = 0;
+				managementCon = GetNodeUserDatabaseConnection(flags, LocalHostName,
+															  PostPortNumber,
+															  CurrentUserName(), "ozan");
+				RemoteTransactionBegin(managementCon);
+				StringInfo managementQuery = makeStringInfo();
+				appendStringInfo(managementQuery,
+								 "SELECT citus_internal_start_management_transaction('%lu')",
+								 GetCurrentFullTransactionId().value);
+				SendRemoteCommand(managementCon, managementQuery->data);
+				ForgetResults(managementCon);
+				managementQuery = makeStringInfo();
+				appendStringInfo(managementQuery,
+								 "SELECT execute_command_on_other_nodes('%s')",
+								 queryString);
+				SendRemoteCommand(managementCon, managementQuery->data);
+				ForgetResults(managementCon);
+			}
+		}
+
 		/*
 		 * Ensure that utility commands do not behave any differently until CREATE
 		 * EXTENSION is invoked.
 		 */
 		PrevProcessUtility(pstmt, queryString, false, context,
 						   params, queryEnv, dest, completionTag);
+
+		if (IsA(parsetree, CreateRoleStmt))
+		{
+			if (!isCitusManagementDatabase())
+			{
+				StringInfo managementQuery = makeStringInfo();
+				CreateRoleStmt *createRoleStmt = castNode(CreateRoleStmt, parsetree);
+				Oid roleOid = get_role_oid(createRoleStmt->role, false);
+				appendStringInfo(managementQuery,
+								 "SELECT citus_mark_object_distributed(%d, '%s', %d)",
+								 1260,
+								 createRoleStmt->role, roleOid);
+				SendRemoteCommand(managementCon, managementQuery->data);
+				ForgetResults(managementCon);
+			}
+		}
 
 		return;
 	}
@@ -936,7 +980,7 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 			ObjectAddress *address = NULL;
 			foreach_ptr(address, addresses)
 			{
-				MarkObjectDistributed(address);
+				MarkObjectDistributed(address, "");
 				TrackPropagatedObject(address);
 			}
 		}

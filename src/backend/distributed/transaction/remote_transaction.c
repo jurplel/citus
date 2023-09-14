@@ -23,8 +23,10 @@
 #include "distributed/backend_data.h"
 #include "distributed/citus_safe_lib.h"
 #include "distributed/connection_management.h"
+#include "distributed/commands/utility_hook.h"
 #include "distributed/listutils.h"
 #include "distributed/metadata_cache.h"
+#include "distributed/metadata/distobject.h"
 #include "distributed/placement_connection.h"
 #include "distributed/remote_commands.h"
 #include "distributed/remote_transaction.h"
@@ -34,6 +36,7 @@
 #include "distributed/worker_manager.h"
 #include "utils/builtins.h"
 #include "utils/hsearch.h"
+#include "utils/xid8.h"
 
 
 #define PREPARED_TRANSACTION_NAME_FORMAT "citus_%u_%u_"UINT64_FORMAT "_%u"
@@ -63,6 +66,69 @@ static char *IsolationLevelName[] = {
 	"REPEATABLE READ",
 	"SERIALIZABLE"
 };
+
+
+PG_FUNCTION_INFO_V1(citus_internal_start_management_transaction);
+PG_FUNCTION_INFO_V1(execute_command_on_other_nodes);
+PG_FUNCTION_INFO_V1(citus_mark_object_distributed);
+
+bool IsManagementCommand = false;
+FullTransactionId outerXid;
+
+Datum
+citus_internal_start_management_transaction(PG_FUNCTION_ARGS)
+{
+	outerXid = PG_GETARG_FULLTRANSACTIONID(0);
+	IsManagementCommand = true;
+
+	PG_RETURN_VOID();
+}
+
+
+Datum
+execute_command_on_other_nodes(PG_FUNCTION_ARGS)
+{
+	text *queryText = PG_GETARG_TEXT_P(0);
+	char *query = text_to_cstring(queryText);
+
+	List *queryList = NIL;
+	queryList = lappend(queryList, "SET citus.enable_create_role_propagation TO OFF;");
+	queryList = lappend(queryList, query);
+	queryList = lappend(queryList, "SET citus.enable_create_role_propagation TO ON;");
+	List *taskList = NodeDDLTaskList(NON_COORDINATOR_NODES, queryList);
+	DDLJob *ddlJob = NULL;
+	foreach_ptr(ddlJob, taskList)
+	{
+		ExecuteDistributedDDLJob(ddlJob);
+	}
+	PG_RETURN_VOID();
+}
+
+
+Datum
+citus_mark_object_distributed(PG_FUNCTION_ARGS)
+{
+	Oid classId = PG_GETARG_OID(0);
+	text *objectNameText = PG_GETARG_TEXT_P(1);
+	char *objectName = text_to_cstring(objectNameText);
+	Oid objectId = PG_GETARG_OID(2);
+	ObjectAddress *objectAddress = palloc0(sizeof(ObjectAddress));
+	ObjectAddressSet(*objectAddress, classId, objectId);
+	MarkObjectDistributed(objectAddress, objectName);
+	PG_RETURN_VOID();
+}
+
+
+/*
+ * Need to turn this to a correct function
+ */
+extern bool
+isCitusManagementDatabase(void)
+{
+	return true;
+
+/*	return strcmp(CurrentDatabaseName(), "ozan") == 0; */
+}
 
 
 /*
@@ -616,7 +682,7 @@ StartRemoteTransactionPrepare(struct MultiConnection *connection)
 	WorkerNode *workerNode = FindWorkerNode(connection->hostname, connection->port);
 	if (workerNode != NULL)
 	{
-		LogTransactionRecord(workerNode->groupId, transaction->preparedName);
+		LogTransactionRecord(workerNode->groupId, transaction->preparedName, outerXid);
 	}
 
 	/*

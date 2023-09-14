@@ -444,7 +444,13 @@ GetEffectiveConnKey(ConnectionHashKey *key)
 		return key;
 	}
 
-	WorkerNode *worker = FindWorkerNode(key->hostname, key->port);
+	WorkerNode *worker = NULL;
+
+	if (CitusHasBeenLoaded())
+	{
+		worker = FindWorkerNode(key->hostname, key->port);
+	}
+
 	if (worker == NULL)
 	{
 		/* this can be hit when the key references an unknown node */

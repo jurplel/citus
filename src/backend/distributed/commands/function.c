@@ -265,7 +265,7 @@ create_distributed_function(PG_FUNCTION_ARGS)
 								   ddlCommand.data);
 	}
 
-	MarkObjectDistributed(functionAddress);
+	MarkObjectDistributed(functionAddress, "");
 
 	if (distributionArgumentName != NULL)
 	{
@@ -885,7 +885,8 @@ UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 			MarkObjectsDistributedCreateCommand(objectAddressList,
 												distArgumentIndexList,
 												colocationIdList,
-												forceDelegationList);
+												forceDelegationList,
+												"");
 		SendCommandToWorkersWithMetadata(workerPgDistObjectUpdateCommand);
 	}
 }

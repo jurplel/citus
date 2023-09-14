@@ -64,6 +64,7 @@
 #include "distributed/pg_dist_schema.h"
 #include "distributed/relation_access_tracking.h"
 #include "distributed/remote_commands.h"
+#include "distributed/remote_transaction.h"
 #include "distributed/resource_lock.h"
 #include "distributed/utils/array_type.h"
 #include "distributed/utils/function.h"
@@ -275,7 +276,7 @@ SyncCitusTableMetadata(Oid relationId)
 	{
 		ObjectAddress relationAddress = { 0 };
 		ObjectAddressSet(relationAddress, RelationRelationId, relationId);
-		MarkObjectDistributed(&relationAddress);
+		MarkObjectDistributed(&relationAddress, "");
 	}
 
 	CreateDependingViewsOnWorkers(relationId);
@@ -318,7 +319,7 @@ CreateDependingViewsOnWorkers(Oid relationId)
 		SendCommandToWorkersWithMetadata(createViewCommand);
 		SendCommandToWorkersWithMetadata(alterViewOwnerCommand);
 
-		MarkObjectDistributed(viewAddress);
+		MarkObjectDistributed(viewAddress, "");
 	}
 
 	SendCommandToWorkersWithMetadata(ENABLE_DDL_PROPAGATION);
@@ -897,7 +898,8 @@ char *
 MarkObjectsDistributedCreateCommand(List *addresses,
 									List *distributionArgumentIndexes,
 									List *colocationIds,
-									List *forceDelegations)
+									List *forceDelegations,
+									char *objectName)
 {
 	StringInfo insertDistributedObjectsCommand = makeStringInfo();
 
@@ -921,7 +923,7 @@ MarkObjectsDistributedCreateCommand(List *addresses,
 		List *args = NIL;
 
 		char *objectType = getObjectTypeDescription(address, false);
-		getObjectIdentityParts(address, &names, &args, false);
+		getObjectIdentityParts(address, &names, &args, IsManagementCommand);
 
 		if (!isFirstObject)
 		{
@@ -935,6 +937,10 @@ MarkObjectsDistributedCreateCommand(List *addresses,
 
 		char *name = NULL;
 		bool firstInNameLoop = true;
+		if (IsManagementCommand)
+		{
+			names = lappend(names, objectName);
+		}
 		foreach_ptr(name, names)
 		{
 			if (!firstInNameLoop)
@@ -1023,7 +1029,7 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	bool prevDependencyCreationValue = EnableMetadataSync;
 	SetLocalEnableMetadataSync(false);
 
-	MarkObjectDistributed(&objectAddress);
+	MarkObjectDistributed(&objectAddress, "");
 
 	if (distributionArgumentIndex != INVALID_DISTRIBUTION_ARGUMENT_INDEX ||
 		colocationId != INVALID_COLOCATION_ID)
@@ -4996,7 +5002,8 @@ SendDistObjectCommands(MetadataSyncContext *context)
 			MarkObjectsDistributedCreateCommand(list_make1(address),
 												list_make1_int(distributionArgumentIndex),
 												list_make1_int(colocationId),
-												list_make1_int(forceDelegation));
+												list_make1_int(forceDelegation),
+												"");
 		SendOrCollectCommandListToActivatedNodes(context,
 												 list_make1(workerMetadataUpdateCommand));
 	}

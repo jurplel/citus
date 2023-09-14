@@ -1401,12 +1401,15 @@ ALTER EXTENSION citus UPDATE TO '12.1-1';
 SELECT * FROM multi_extension.print_extension_changes();
  previous_object |                                     current_object
 ---------------------------------------------------------------------
+                 | function add_to_pg_dist_node_on_all_nodes(oid,text,oid) void
                  | function citus_internal_delete_placement_metadata(bigint) void
                  | function citus_internal_update_none_dist_table_metadata(oid,"char",bigint,boolean) void
                  | function citus_pause_node_within_txn(integer,boolean,integer) void
                  | function citus_schema_move(regnamespace,integer,citus.shard_transfer_mode) void
                  | function citus_schema_move(regnamespace,text,integer,citus.shard_transfer_mode) void
-(5 rows)
+                 | function execute_command_on_other_nodes(text) void
+                 | function start_management_transaction(xid8) void
+(8 rows)
 
 -- Test downgrade to 12.1-1 from 12.2-1
 ALTER EXTENSION citus UPDATE TO '12.2-1';

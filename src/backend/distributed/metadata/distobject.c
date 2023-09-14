@@ -37,6 +37,7 @@
 #include "distributed/metadata/pg_dist_object.h"
 #include "distributed/metadata_cache.h"
 #include "distributed/metadata_sync.h"
+#include "distributed/remote_commands.h"
 #include "distributed/version_compat.h"
 #include "distributed/worker_transaction.h"
 #include "executor/spi.h"
@@ -50,7 +51,8 @@
 #include "utils/rel.h"
 
 
-static char * CreatePgDistObjectEntryCommand(const ObjectAddress *objectAddress);
+static char * CreatePgDistObjectEntryCommand(const ObjectAddress *objectAddress,
+											 char *name);
 static int ExecuteCommandAsSuperuser(char *query, int paramCount, Oid *paramTypes,
 									 Datum *paramValues);
 static bool IsObjectDistributed(const ObjectAddress *address);
@@ -156,14 +158,18 @@ ObjectExists(const ObjectAddress *address)
  * to mark dependent objects as distributed check MarkObjectDistributedViaSuperUser.
  */
 void
-MarkObjectDistributed(const ObjectAddress *distAddress)
+MarkObjectDistributed(const ObjectAddress *distAddress, char *name)
 {
+	if (!isCitusManagementDatabase())
+	{
+		return;
+	}
 	MarkObjectDistributedLocally(distAddress);
 
 	if (EnableMetadataSync)
 	{
 		char *workerPgDistObjectUpdateCommand =
-			CreatePgDistObjectEntryCommand(distAddress);
+			CreatePgDistObjectEntryCommand(distAddress, name);
 		SendCommandToWorkersWithMetadata(workerPgDistObjectUpdateCommand);
 	}
 }
@@ -186,7 +192,7 @@ MarkObjectDistributedViaSuperUser(const ObjectAddress *distAddress)
 	if (EnableMetadataSync)
 	{
 		char *workerPgDistObjectUpdateCommand =
-			CreatePgDistObjectEntryCommand(distAddress);
+			CreatePgDistObjectEntryCommand(distAddress, "");
 		SendCommandToWorkersWithMetadataViaSuperUser(workerPgDistObjectUpdateCommand);
 	}
 }
@@ -277,7 +283,7 @@ ShouldMarkRelationDistributed(Oid relationId)
  * for the given object address.
  */
 static char *
-CreatePgDistObjectEntryCommand(const ObjectAddress *objectAddress)
+CreatePgDistObjectEntryCommand(const ObjectAddress *objectAddress, char *name)
 {
 	/* create a list by adding the address of value to not to have warning */
 	List *objectAddressList =
@@ -290,7 +296,8 @@ CreatePgDistObjectEntryCommand(const ObjectAddress *objectAddress)
 		MarkObjectsDistributedCreateCommand(objectAddressList,
 											distArgumetIndexList,
 											colocationIdList,
-											forceDelegationList);
+											forceDelegationList,
+											name);
 
 	return workerPgDistObjectUpdateCommand;
 }

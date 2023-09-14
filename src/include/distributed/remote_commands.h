@@ -76,5 +76,7 @@ extern void StoreErrorMessage(MultiConnection *connection, StringInfo queryResul
 
 extern bool IsSettingSafeToPropagate(const char *name);
 
+extern bool isCitusManagementDatabase(void);
+
 
 #endif /* REMOTE_COMMAND_H */

@@ -55,6 +55,7 @@
 #include "distributed/pg_dist_partition.h"
 #include "distributed/pg_dist_shard.h"
 #include "distributed/pg_dist_placement.h"
+#include "distributed/remote_commands.h"
 #include "distributed/shared_library_init.h"
 #include "distributed/shardinterval_utils.h"
 #include "distributed/utils/array_type.h"
@@ -5723,6 +5724,10 @@ GetPoolinfoViaCatalog(int32 nodeId)
 char *
 GetAuthinfoViaCatalog(const char *roleName, int64 nodeId)
 {
+	if (!isCitusManagementDatabase())
+	{
+		return "";
+	}
 	char *authinfo = "";
 	Datum nodeIdDatumArray[2] = {
 		Int32GetDatum(nodeId),

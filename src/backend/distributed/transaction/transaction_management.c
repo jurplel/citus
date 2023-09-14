@@ -317,7 +317,8 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 			MemoryContext previousContext =
 				MemoryContextSwitchTo(CitusXactCallbackContext);
 
-			if (CurrentCoordinatedTransactionState == COORD_TRANS_PREPARED)
+			if (CurrentCoordinatedTransactionState == COORD_TRANS_PREPARED &&
+				!IsManagementCommand)
 			{
 				/* handles both already prepared and open transactions */
 				CoordinatedRemoteTransactionsCommit();

@@ -22,7 +22,7 @@ extern bool ObjectExists(const ObjectAddress *address);
 extern bool CitusExtensionObject(const ObjectAddress *objectAddress);
 extern bool IsAnyObjectDistributed(const List *addresses);
 extern bool ClusterHasDistributedFunctionWithDistArgument(void);
-extern void MarkObjectDistributed(const ObjectAddress *distAddress);
+extern void MarkObjectDistributed(const ObjectAddress *distAddress, char *name);
 extern void MarkObjectDistributedViaSuperUser(const ObjectAddress *distAddress);
 extern void MarkObjectDistributedLocally(const ObjectAddress *distAddress);
 extern void UnmarkObjectDistributed(const ObjectAddress *address);

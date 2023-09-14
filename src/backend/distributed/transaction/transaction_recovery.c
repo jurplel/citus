@@ -45,6 +45,7 @@
 #include "utils/fmgroids.h"
 #include "utils/memutils.h"
 #include "utils/rel.h"
+#include "utils/xid8.h"
 
 
 /* exports for SQL callable functions */
@@ -81,7 +82,7 @@ recover_prepared_transactions(PG_FUNCTION_ARGS)
  * prepared transaction should be committed.
  */
 void
-LogTransactionRecord(int32 groupId, char *transactionName)
+LogTransactionRecord(int32 groupId, char *transactionName, FullTransactionId outerXid)
 {
 	Datum values[Natts_pg_dist_transaction];
 	bool isNulls[Natts_pg_dist_transaction];
@@ -92,6 +93,7 @@ LogTransactionRecord(int32 groupId, char *transactionName)
 
 	values[Anum_pg_dist_transaction_groupid - 1] = Int32GetDatum(groupId);
 	values[Anum_pg_dist_transaction_gid - 1] = CStringGetTextDatum(transactionName);
+	values[Anum_pg_dist_transaction_outerxid - 1] = FullTransactionIdGetDatum(outerXid);
 
 	/* open transaction relation and insert new tuple */
 	Relation pgDistTransaction = table_open(DistTransactionRelationId(),

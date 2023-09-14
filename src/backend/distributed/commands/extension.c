@@ -626,7 +626,7 @@ MarkExistingObjectDependenciesDistributedIfSupported()
 	ObjectAddress *objectAddress = NULL;
 	foreach_ptr(objectAddress, uniqueObjectAddresses)
 	{
-		MarkObjectDistributed(objectAddress);
+		MarkObjectDistributed(objectAddress, "");
 	}
 
 	SetLocalEnableMetadataSync(prevMetadataSyncValue);
