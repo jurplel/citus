@@ -143,6 +143,6 @@ extern void CoordinatedRemoteTransactionsSavepointBegin(SubTransactionId subId);
 extern void CoordinatedRemoteTransactionsSavepointRelease(SubTransactionId subId);
 extern void CoordinatedRemoteTransactionsSavepointRollback(SubTransactionId subId);
 
-extern bool isManagementCommand;
+extern bool IsManagementCommand;
 
 #endif /* REMOTE_TRANSACTION_H */
