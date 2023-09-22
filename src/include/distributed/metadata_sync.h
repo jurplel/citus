@@ -88,10 +88,10 @@ extern List * NodeMetadataCreateCommands(void);
 extern List * CitusTableMetadataCreateCommandList(Oid relationId);
 extern List * NodeMetadataDropCommands(void);
 extern char * MarkObjectsDistributedCreateCommand(List *addresses,
+												  List *names,
 												  List *distributionArgumentIndexes,
 												  List *colocationIds,
-												  List *forceDelegations,
-												  char *name);
+												  List *forceDelegations);
 extern char * DistributionCreateCommand(CitusTableCacheEntry *cacheEntry);
 extern char * DistributionDeleteCommand(const char *schemaName,
 										const char *tableName);

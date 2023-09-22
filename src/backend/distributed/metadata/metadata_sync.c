@@ -276,7 +276,7 @@ SyncCitusTableMetadata(Oid relationId)
 	{
 		ObjectAddress relationAddress = { 0 };
 		ObjectAddressSet(relationAddress, RelationRelationId, relationId);
-		MarkObjectDistributed(&relationAddress, "");
+		MarkObjectDistributed(&relationAddress);
 	}
 
 	CreateDependingViewsOnWorkers(relationId);
@@ -319,7 +319,7 @@ CreateDependingViewsOnWorkers(Oid relationId)
 		SendCommandToWorkersWithMetadata(createViewCommand);
 		SendCommandToWorkersWithMetadata(alterViewOwnerCommand);
 
-		MarkObjectDistributed(viewAddress, "");
+		MarkObjectDistributed(viewAddress);
 	}
 
 	SendCommandToWorkersWithMetadata(ENABLE_DDL_PROPAGATION);
@@ -896,10 +896,10 @@ NodeListIdempotentInsertCommand(List *workerNodeList)
  */
 char *
 MarkObjectsDistributedCreateCommand(List *addresses,
+									List *namesArg,
 									List *distributionArgumentIndexes,
 									List *colocationIds,
-									List *forceDelegations,
-									char *objectName)
+									List *forceDelegations)
 {
 	StringInfo insertDistributedObjectsCommand = makeStringInfo();
 
@@ -921,9 +921,18 @@ MarkObjectsDistributedCreateCommand(List *addresses,
 		int forceDelegation = list_nth_int(forceDelegations, currentObjectCounter);
 		List *names = NIL;
 		List *args = NIL;
+		char *objectType = NULL;
 
-		char *objectType = getObjectTypeDescription(address, false);
-		getObjectIdentityParts(address, &names, &args, IsManagementCommand);
+		if (IsManagementCommand)
+		{
+			names = namesArg;
+			objectType = "role";
+		}
+		else
+		{
+			objectType = getObjectTypeDescription(address, false);
+			getObjectIdentityParts(address, &names, &args, IsManagementCommand);
+		}
 
 		if (!isFirstObject)
 		{
@@ -937,10 +946,6 @@ MarkObjectsDistributedCreateCommand(List *addresses,
 
 		char *name = NULL;
 		bool firstInNameLoop = true;
-		if (IsManagementCommand)
-		{
-			names = lappend(names, objectName);
-		}
 		foreach_ptr(name, names)
 		{
 			if (!firstInNameLoop)
@@ -1029,7 +1034,7 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	bool prevDependencyCreationValue = EnableMetadataSync;
 	SetLocalEnableMetadataSync(false);
 
-	MarkObjectDistributed(&objectAddress, "");
+	MarkObjectDistributed(&objectAddress);
 
 	if (distributionArgumentIndex != INVALID_DISTRIBUTION_ARGUMENT_INDEX ||
 		colocationId != INVALID_COLOCATION_ID)
@@ -5000,10 +5005,10 @@ SendDistObjectCommands(MetadataSyncContext *context)
 
 		char *workerMetadataUpdateCommand =
 			MarkObjectsDistributedCreateCommand(list_make1(address),
+												NIL,
 												list_make1_int(distributionArgumentIndex),
 												list_make1_int(colocationId),
-												list_make1_int(forceDelegation),
-												"");
+												list_make1_int(forceDelegation));
 		SendOrCollectCommandListToActivatedNodes(context,
 												 list_make1(workerMetadataUpdateCommand));
 	}

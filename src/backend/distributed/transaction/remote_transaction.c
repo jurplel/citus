@@ -114,7 +114,7 @@ citus_mark_object_distributed(PG_FUNCTION_ARGS)
 	Oid objectId = PG_GETARG_OID(2);
 	ObjectAddress *objectAddress = palloc0(sizeof(ObjectAddress));
 	ObjectAddressSet(*objectAddress, classId, objectId);
-	MarkObjectDistributed(objectAddress, objectName);
+	MarkObjectDistributedWithName(objectAddress, objectName);
 	PG_RETURN_VOID();
 }
 

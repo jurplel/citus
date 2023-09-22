@@ -52,7 +52,7 @@
 
 
 static char * CreatePgDistObjectEntryCommand(const ObjectAddress *objectAddress,
-											 char *name);
+											 char *objectName);
 static int ExecuteCommandAsSuperuser(char *query, int paramCount, Oid *paramTypes,
 									 Datum *paramValues);
 static bool IsObjectDistributed(const ObjectAddress *address);
@@ -158,7 +158,14 @@ ObjectExists(const ObjectAddress *address)
  * to mark dependent objects as distributed check MarkObjectDistributedViaSuperUser.
  */
 void
-MarkObjectDistributed(const ObjectAddress *distAddress, char *name)
+MarkObjectDistributed(const ObjectAddress *distAddress)
+{
+	MarkObjectDistributedWithName(distAddress, "");	
+}
+
+
+void
+MarkObjectDistributedWithName(const ObjectAddress *distAddress, char* objectName)
 {
 	if (!isCitusManagementDatabase())
 	{
@@ -169,7 +176,7 @@ MarkObjectDistributed(const ObjectAddress *distAddress, char *name)
 	if (EnableMetadataSync)
 	{
 		char *workerPgDistObjectUpdateCommand =
-			CreatePgDistObjectEntryCommand(distAddress, name);
+			CreatePgDistObjectEntryCommand(distAddress, objectName);
 		SendCommandToWorkersWithMetadata(workerPgDistObjectUpdateCommand);
 	}
 }
@@ -283,21 +290,22 @@ ShouldMarkRelationDistributed(Oid relationId)
  * for the given object address.
  */
 static char *
-CreatePgDistObjectEntryCommand(const ObjectAddress *objectAddress, char *name)
+CreatePgDistObjectEntryCommand(const ObjectAddress *objectAddress, char *objectName)
 {
 	/* create a list by adding the address of value to not to have warning */
 	List *objectAddressList =
 		list_make1((ObjectAddress *) objectAddress);
+	List *objectNameList = list_make1((char *)objectName);
 	List *distArgumetIndexList = list_make1_int(INVALID_DISTRIBUTION_ARGUMENT_INDEX);
 	List *colocationIdList = list_make1_int(INVALID_COLOCATION_ID);
 	List *forceDelegationList = list_make1_int(NO_FORCE_PUSHDOWN);
 
 	char *workerPgDistObjectUpdateCommand =
 		MarkObjectsDistributedCreateCommand(objectAddressList,
+											objectNameList,
 											distArgumetIndexList,
 											colocationIdList,
-											forceDelegationList,
-											name);
+											forceDelegationList);
 
 	return workerPgDistObjectUpdateCommand;
 }

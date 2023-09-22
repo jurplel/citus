@@ -980,7 +980,7 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 			ObjectAddress *address = NULL;
 			foreach_ptr(address, addresses)
 			{
-				MarkObjectDistributed(address, "");
+				MarkObjectDistributed(address);
 				TrackPropagatedObject(address);
 			}
 		}
