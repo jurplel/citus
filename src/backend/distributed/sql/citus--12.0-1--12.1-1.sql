@@ -15,5 +15,6 @@
 #include "udfs/citus_internal_start_management_transaction/12.1-1.sql"
 #include "udfs/execute_command_on_other_nodes/12.1-1.sql"
 #include "udfs/citus_mark_object_distributed/12.1-1.sql"
+#include "udfs/commit_management_command_2PC/12.1-1.sql"
 
 ALTER TABLE pg_catalog.pg_dist_transaction ADD COLUMN outer_xid xid8;

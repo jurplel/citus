@@ -34,6 +34,7 @@
 #include "distributed/transaction_management.h"
 #include "distributed/transaction_recovery.h"
 #include "distributed/worker_manager.h"
+#include "postmaster/postmaster.h"
 #include "utils/builtins.h"
 #include "utils/hsearch.h"
 #include "utils/xid8.h"
@@ -71,9 +72,12 @@ static char *IsolationLevelName[] = {
 PG_FUNCTION_INFO_V1(citus_internal_start_management_transaction);
 PG_FUNCTION_INFO_V1(execute_command_on_other_nodes);
 PG_FUNCTION_INFO_V1(citus_mark_object_distributed);
+PG_FUNCTION_INFO_V1(commit_management_command_2PC);
 
 bool IsManagementCommand = false;
 FullTransactionId outerXid;
+static MultiConnection *managementCon = NULL;
+bool CitusManagementDatabase = true;
 
 Datum
 citus_internal_start_management_transaction(PG_FUNCTION_ARGS)
@@ -119,15 +123,45 @@ citus_mark_object_distributed(PG_FUNCTION_ARGS)
 }
 
 
+Datum
+commit_management_command_2PC(PG_FUNCTION_ARGS)
+{
+	CoordinatedRemoteTransactionsCommit();
+
+	PG_RETURN_VOID();
+}
+
+
 /*
  * Need to turn this to a correct function
  */
-extern bool
+bool
 isCitusManagementDatabase(void)
 {
-	return true;
+	return CitusManagementDatabase;
+}
 
-/*	return strcmp(CurrentDatabaseName(), "ozan") == 0; */
+
+void
+runCitusManagementQuery(char *query)
+{
+	if (managementCon == NULL)
+	{
+		int flags = 0;
+		managementCon = GetNodeUserDatabaseConnection(flags, LocalHostName,
+												  PostPortNumber,
+												  "ozan", "ozan");
+		RemoteTransactionBegin(managementCon);
+	}
+
+	SendRemoteCommand(managementCon, query);
+	ForgetResults(managementCon);
+}
+
+void
+cleanConnection(void)
+{
+	managementCon = NULL;
 }
 
 

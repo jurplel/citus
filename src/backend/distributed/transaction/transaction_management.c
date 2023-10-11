@@ -41,6 +41,7 @@
 #include "distributed/transaction_management.h"
 #include "distributed/placement_connection.h"
 #include "distributed/relation_access_tracking.h"
+#include "distributed/remote_commands.h"
 #include "distributed/shared_connection_stats.h"
 #include "distributed/shard_cleaner.h"
 #include "distributed/subplan_execution.h"
@@ -48,6 +49,7 @@
 #include "distributed/worker_log_messages.h"
 #include "distributed/commands.h"
 #include "distributed/metadata_cache.h"
+#include "postmaster/postmaster.h"
 #include "utils/hsearch.h"
 #include "utils/guc.h"
 #include "utils/memutils.h"
@@ -324,6 +326,17 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 				CoordinatedRemoteTransactionsCommit();
 			}
 
+			if (!isCitusManagementDatabase())
+			{
+				int flags = 0;
+				MultiConnection *managementConnnn = GetNodeUserDatabaseConnection(flags, LocalHostName,
+																				  PostPortNumber,
+																				  "ozan", "ozan");
+				RemoteTransactionBeginIfNecessary(managementConnnn);
+				SendRemoteCommand(managementConnnn, "SELECT commit_management_command_2PC()");
+				ForgetResults(managementConnnn);
+			}
+
 			/* close connections etc. */
 			if (CurrentCoordinatedTransactionState != COORD_TRANS_NONE)
 			{
@@ -538,7 +551,10 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 				 * us to mark failed placements as invalid.  Better don't use
 				 * this for anything important (i.e. DDL/metadata).
 				 */
-				CoordinatedRemoteTransactionsCommit();
+				if (isCitusManagementDatabase())
+				{
+					CoordinatedRemoteTransactionsCommit();
+				}
 				CurrentCoordinatedTransactionState = COORD_TRANS_COMMITTED;
 			}
 

@@ -112,7 +112,6 @@ static void DecrementUtilityHookCountersIfNecessary(Node *parsetree);
 static bool IsDropSchemaOrDB(Node *parsetree);
 static bool ShouldCheckUndistributeCitusLocalTables(void);
 
-static MultiConnection *managementCon = NULL;
 
 /*
  * ProcessUtilityParseTree is a convenience method to create a PlannedStmt out of
@@ -248,23 +247,16 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 		{
 			if (!isCitusManagementDatabase())
 			{
-				int flags = 0;
-				managementCon = GetNodeUserDatabaseConnection(flags, LocalHostName,
-															  PostPortNumber,
-															  CurrentUserName(), "ozan");
-				RemoteTransactionBegin(managementCon);
 				StringInfo managementQuery = makeStringInfo();
 				appendStringInfo(managementQuery,
 								 "SELECT citus_internal_start_management_transaction('%lu')",
 								 GetCurrentFullTransactionId().value);
-				SendRemoteCommand(managementCon, managementQuery->data);
-				ForgetResults(managementCon);
+				runCitusManagementQuery(managementQuery->data);
 				managementQuery = makeStringInfo();
 				appendStringInfo(managementQuery,
 								 "SELECT execute_command_on_other_nodes('%s')",
 								 queryString);
-				SendRemoteCommand(managementCon, managementQuery->data);
-				ForgetResults(managementCon);
+				runCitusManagementQuery(managementQuery->data);
 			}
 		}
 
@@ -286,8 +278,8 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 								 "SELECT citus_mark_object_distributed(%d, '%s', %d)",
 								 1260,
 								 createRoleStmt->role, roleOid);
-				SendRemoteCommand(managementCon, managementQuery->data);
-				ForgetResults(managementCon);
+				runCitusManagementQuery(managementQuery->data);
+				cleanConnection();
 			}
 		}
 

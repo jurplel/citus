@@ -84,6 +84,7 @@
 #include "distributed/time_constants.h"
 #include "distributed/query_stats.h"
 #include "distributed/remote_commands.h"
+#include "distributed/remote_transaction.h"
 #include "distributed/shard_rebalancer.h"
 #include "distributed/shared_library_init.h"
 #include "distributed/statistics_collection.h"
@@ -1818,6 +1819,16 @@ RegisterCitusConfigVariables(void)
 		2 * 60 * 60 * 1000, 0, 7 * 24 * 3600 * 1000,
 		PGC_SIGHUP,
 		GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_UNIT_MS,
+		NULL, NULL, NULL);
+
+	DefineCustomBoolVariable(
+		"citus.management_database",
+		gettext_noop("is this the management database"),
+		NULL,
+		&CitusManagementDatabase,
+		true,
+		PGC_USERSET,
+		GUC_STANDARD,
 		NULL, NULL, NULL);
 
 	DefineCustomIntVariable(
