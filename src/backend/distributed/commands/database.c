@@ -40,7 +40,6 @@
 static AlterOwnerStmt * RecreateAlterDatabaseOwnerStmt(Oid databaseOid);
 
 
-PG_FUNCTION_INFO_V1(citus_internal_database_command);
 static Oid get_database_owner(Oid db_oid);
 List * PreprocessGrantOnDatabaseStmt(Node *node, const char *queryString,
 									 ProcessUtilityContext processUtilityContext);
@@ -271,84 +270,22 @@ PostprocessCreateDatabaseStmt(Node *node, const char *queryString)
 	EnsureCoordinator();
 
 	char *createDatabaseCommand = DeparseTreeNode(node);
-
-	StringInfo internalCreateCommand = makeStringInfo();
-	appendStringInfo(internalCreateCommand,
-					 "SELECT pg_catalog.citus_internal_database_command(%s)",
-					 quote_literal_cstr(createDatabaseCommand));
-
 	List *commands = list_make3(DISABLE_DDL_PROPAGATION,
-								(void *) internalCreateCommand->data,
+								createDatabaseCommand,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
-}
+	List *ddlJobs = NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+    DDLJob *ddlJob = NULL;
+    foreach_ptr(ddlJob, ddlJobs)
+    {
+        Task *task = NULL;
+        foreach_ptr(task, ddlJob->taskList)
+        {
+            task->cannotBeExecutedInTransction = true;
+        }
+    }
 
-
-/*
- * citus_internal_database_command is an internal UDF to
- * create/drop a database in an idempotent maner without
- * transaction block restrictions.
- */
-Datum
-citus_internal_database_command(PG_FUNCTION_ARGS)
-{
-	int saveNestLevel = NewGUCNestLevel();
-	text *commandText = PG_GETARG_TEXT_P(0);
-	char *command = text_to_cstring(commandText);
-	Node *parseTree = ParseTreeNode(command);
-
-	set_config_option("citus.enable_ddl_propagation", "off",
-					  (superuser() ? PGC_SUSET : PGC_USERSET), PGC_S_SESSION,
-					  GUC_ACTION_LOCAL, true, 0, false);
-
-	set_config_option("citus.enable_create_database_propagation", "off",
-					  (superuser() ? PGC_SUSET : PGC_USERSET), PGC_S_SESSION,
-					  GUC_ACTION_LOCAL, true, 0, false);
-
-	/*
-	 * createdb() / DropDatabase() uses ParseState to report the error position for the
-	 * input command and the position is reported to be 0 when it's provided as NULL.
-	 * We're okay with that because we don't expect this UDF to be called with an incorrect
-	 * DDL command.
-	 *
-	 */
-	ParseState *pstate = NULL;
-
-	if (IsA(parseTree, CreatedbStmt))
-	{
-		CreatedbStmt *stmt = castNode(CreatedbStmt, parseTree);
-
-		bool missingOk = true;
-		Oid databaseOid = get_database_oid(stmt->dbname, missingOk);
-
-		if (!OidIsValid(databaseOid))
-		{
-			createdb(pstate, (CreatedbStmt *) parseTree);
-		}
-	}
-	else if (IsA(parseTree, DropdbStmt))
-	{
-		DropdbStmt *stmt = castNode(DropdbStmt, parseTree);
-
-		bool missingOk = false;
-		Oid databaseOid = get_database_oid(stmt->dbname, missingOk);
-
-
-		if (OidIsValid(databaseOid))
-		{
-			DropDatabase(pstate, (DropdbStmt *) parseTree);
-		}
-	}
-	else
-	{
-		ereport(ERROR, (errmsg("unsupported command type %d", nodeTag(parseTree))));
-	}
-
-	/* Below command rollbacks flags to the state before this session*/
-	AtEOXact_GUC(true, saveNestLevel);
-
-	PG_RETURN_VOID();
+    return ddlJobs;
 }
 
 
@@ -384,17 +321,22 @@ PreprocessDropDatabaseStmt(Node *node, const char *queryString,
 
 	char *dropDatabaseCommand = DeparseTreeNode(node);
 
-	StringInfo internalDropCommand = makeStringInfo();
-	appendStringInfo(internalDropCommand,
-					 "SELECT pg_catalog.citus_internal_database_command(%s)",
-					 quote_literal_cstr(dropDatabaseCommand));
-
-
 	List *commands = list_make3(DISABLE_DDL_PROPAGATION,
-								(void *) internalDropCommand->data,
+								dropDatabaseCommand,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	List *ddlJobs = NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+    DDLJob *ddlJob = NULL;
+    foreach_ptr(ddlJob, ddlJobs)
+    {
+        Task *task = NULL;
+        foreach_ptr(task, ddlJob->taskList)
+        {
+            task->cannotBeExecutedInTransction = true;
+        }
+    }
+
+    return ddlJobs;
 }
 
 
