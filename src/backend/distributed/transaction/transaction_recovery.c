@@ -259,6 +259,26 @@ RecoverWorkerTransactions(WorkerNode *workerNode)
 			continue;
 		}
 
+		/* Check if the transaction is created by an outer transaction from another database */
+		bool outerXidIsNull = false;
+		Datum outerXidDatum = heap_getattr(heapTuple,
+										   Anum_pg_dist_transaction_outerxid,
+									  	   tupleDescriptor, &outerXidIsNull);
+		
+		if (!outerXidIsNull)
+		{
+			FullTransactionId outerFullXid = DatumGetFullTransactionId(outerXidDatum);
+			TransactionId outerXid = XidFromFullTransactionId(outerFullXid);
+			if (TransactionIdIsInProgress(outerXid) || !TransactionIdDidCommit(outerXid))
+			{
+				/*
+				 * The transaction is initiated from an outer transaction and the outer
+				 * transaction is not yet committed, so we should not commit either
+				 */
+				 continue;
+			}
+		}
+
 		/*
 		 * Remove the transaction from the pending list such that only transactions
 		 * that need to be aborted remain at the end.
